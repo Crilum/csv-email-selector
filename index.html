@@ -2,6 +2,558 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>CSV Email Cleaner: Cinematic Opal</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* Deep space base, the 3D nebula will do the heavy lifting */
+    background: #020108; 
+  }
+
+  #webgl-canvas {
+    position: absolute;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+  }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    width: 550px;
+    padding: 50px;
+    border-radius: 32px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 50px 120px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
+    transition: transform 0.1s ease-out, box-shadow 1s ease;
+    transform-style: preserve-3d;
+  }
+
+  .container.success {
+    box-shadow: 0 50px 120px rgba(0, 255, 170, 0.15), inset 0 0 40px rgba(0, 255, 170, 0.1);
+    border-top: 1px solid rgba(0, 255, 170, 0.6);
+    border-left: 1px solid rgba(0, 255, 170, 0.6);
+  }
+
+  h1 { margin-top: 0; font-weight: 800; font-size: 36px; letter-spacing: 1px; text-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+  p { opacity: 0.9; line-height: 1.6; font-size: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+
+  input[type=file] {
+    margin-top: 25px; padding: 14px; width: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(0, 0, 0, 0.6);
+    border-left: 1px solid rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s ease;
+  }
+  
+  input[type=file]:hover { background: rgba(0, 0, 0, 0.6); }
+  input[type=file]::file-selector-button {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px; color: #fff; padding: 8px 16px; margin-right: 15px; cursor: pointer; transition: 0.2s;
+  }
+  input[type=file]::file-selector-button:hover { background: rgba(255,255,255,0.4); box-shadow: 0 0 10px rgba(255,255,255,0.2); }
+
+  button {
+    margin-top: 25px; width: 100%; padding: 18px; font-size: 16px;
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 18px;
+    background: linear-gradient(135deg, rgba(0, 234, 255, 0.3), rgba(255, 79, 216, 0.3));
+    color: white; font-weight: 800; cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); transition: 0.5s;
+  }
+
+  button:hover:not(:disabled) { 
+    transform: translateY(-2px); 
+    background: linear-gradient(135deg, rgba(0, 234, 255, 0.5), rgba(255, 79, 216, 0.5)); 
+    border: 1px solid rgba(255,255,255,0.6); 
+    box-shadow: 0 15px 40px rgba(255, 79, 216, 0.3); 
+  }
+  button:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(100%); }
+  button.success-btn { 
+    background: linear-gradient(135deg, rgba(0, 255, 170, 0.5), rgba(0, 150, 255, 0.5)); 
+    border-color: rgba(0, 255, 170, 0.8); 
+    box-shadow: 0 15px 40px rgba(0, 255, 170, 0.3);
+  }
+
+  #status {
+    margin-top: 20px; padding: 16px; border-radius: 14px;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(0, 0, 0, 0.6); border-left: 1px solid rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); border-right: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 14px; text-align: center; transition: 0.5s;
+  }
+
+  .footer { margin-top: 20px; font-size: 13px; opacity: 0.7; text-align: center; font-weight: 500; letter-spacing: 0.5px; }
+</style>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+
+<canvas id="webgl-canvas"></canvas>
+
+<div class="container" id="glass-card">
+  <h1>CSV Email Cleaner</h1>
+  <p>Upload a CSV file. It will auto-detect the email column, remove invalid rows, and clean the emails instantly.</p>
+
+  <input type="file" id="fileInput" accept=".csv">
+  <button id="downloadBtn" disabled>Download Clean CSV</button>
+  <div id="status">Waiting for CSV file...</div>
+  <div class="footer">✨ Nebula Depth • Iridescence • Ambient Lighting ✨</div>
+</div>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+  let isCleaned = false;
+
+  // --- WebGL Core Setup ---
+  const canvas = document.getElementById('webgl-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0; 
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.z = 15;
+
+  // --- The "Never Grey" Environment Map Fix ---
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
+  
+  const envScene = new THREE.Scene();
+  // Fill the virtual environment with deep jewel tones instead of black
+  envScene.background = new THREE.Color(0x0a0522); 
+  // Add a massive ambient fill light so the dark sides of the glass are brightly colored
+  envScene.add(new THREE.AmbientLight(0x00eaff, 3.0)); 
+  envScene.add(new THREE.AmbientLight(0xff00aa, 3.0));
+  
+  const envLight1 = new THREE.DirectionalLight(0xffffff, 4.0); envLight1.position.set(5, 5, 5); envScene.add(envLight1);
+  const envLight2 = new THREE.DirectionalLight(0xffffff, 4.0); envLight2.position.set(-5, -5, -5); envScene.add(envLight2);
+  
+  scene.environment = pmremGenerator.fromScene(envScene).texture;
+
+  // --- Post-Processing Pipeline (Softened) ---
+  const renderScene = new RenderPass(scene, camera);
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    1.2,   // Lowered strength for a softer, dreamier glow
+    1.0,   // Wider, smoother radius
+    0.65   // Higher threshold so it doesn't flash on everything
+  );
+
+  const composer = new EffectComposer(renderer);
+  composer.addPass(renderScene);
+  composer.addPass(bloomPass);
+
+  // --- 3D Nebula Background (The Boring Background Fix) ---
+  const nebGeom = new THREE.BufferGeometry();
+  const nebCount = 4000;
+  const nebPos = new Float32Array(nebCount * 3);
+  const nebColors = new Float32Array(nebCount * 3);
+  
+  const color1 = new THREE.Color(0x00eaff);
+  const color2 = new THREE.Color(0x8a2be2);
+  const color3 = new THREE.Color(0xff00aa);
+
+  for(let i=0; i<nebCount; i++) {
+    nebPos[i*3] = (Math.random() - 0.5) * 120; // X spread
+    nebPos[i*3+1] = (Math.random() - 0.5) * 120; // Y spread
+    nebPos[i*3+2] = -20 - Math.random() * 60; // Push far into the background
+    
+    // Mix 3 colors randomly for the nebula
+    const randColor = Math.random();
+    let c = color1;
+    if (randColor > 0.66) c = color2;
+    else if (randColor > 0.33) c = color3;
+
+    nebColors[i*3] = c.r; 
+    nebColors[i*3+1] = c.g; 
+    nebColors[i*3+2] = c.b;
+  }
+
+  nebGeom.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+  nebGeom.setAttribute('color', new THREE.BufferAttribute(nebColors, 3));
+  
+  const nebMat = new THREE.PointsMaterial({ 
+    size: 0.15, 
+    vertexColors: true, 
+    transparent: true, 
+    opacity: 0.5, 
+    blending: THREE.AdditiveBlending 
+  });
+  
+  const nebulaMesh = new THREE.Points(nebGeom, nebMat);
+  scene.add(nebulaMesh);
+
+  // --- Advanced Lighting (Smoothed out) ---
+  const lightGroup = new THREE.Group();
+  scene.add(lightGroup);
+  
+  const hemiLight = new THREE.HemisphereLight(0x00eaff, 0xff00aa, 1.0); // Boosted overall scene color
+  scene.add(hemiLight);
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Much stronger ambient light
+  scene.add(ambientLight);
+
+  const pointLights = [];
+  const baseColors = [0x00eaff, 0xff00aa, 0x6a5cff]; // Removed the harsh yellow/orange
+  const successColor = new THREE.Color(0x00ffaa);
+  
+  baseColors.forEach((colorHex, i) => {
+    // Reduced intensity from 80/100 down to 40 for a softer look
+    const light = new THREE.PointLight(colorHex, 40, 60);
+    lightGroup.add(light);
+    pointLights.push({
+      light: light,
+      baseColor: new THREE.Color(colorHex),
+      offset: i * ((Math.PI * 2) / 3),
+      speed: 0.15 + Math.random() * 0.1 // Much slower, relaxing orbit
+    });
+  });
+
+  // --- Gentle Energy Fireflies ---
+  const fireflies = [];
+  const fireflyGeom = new THREE.SphereGeometry(0.06, 16, 16);
+  for(let i=0; i<12; i++) {
+    const color = new THREE.Color().setHSL(Math.random(), 1.0, 0.7);
+    const mat = new THREE.MeshBasicMaterial({ color: color });
+    const mesh = new THREE.Mesh(fireflyGeom, mat);
+    
+    // Softer micro-lights
+    const light = new THREE.PointLight(color, 10, 15);
+    mesh.add(light);
+    
+    mesh.position.set((Math.random()-0.5)*35, (Math.random()-0.5)*25, (Math.random()-0.5)*20 - 5);
+    scene.add(mesh);
+    
+    fireflies.push({
+      mesh: mesh,
+      speedX: (Math.random()-0.5)*0.015, speedY: (Math.random()-0.5)*0.015, speedZ: (Math.random()-0.5)*0.015 // Slower floating
+    });
+  }
+
+  // --- Layer 1: Frosted Opal Jewels (With Base Colors!) ---
+  const bgGroup = new THREE.Group();
+  scene.add(bgGroup);
+  
+  const bgGeometries = [
+    new THREE.IcosahedronGeometry(1.5, 0),
+    new THREE.DodecahedronGeometry(1.5, 0),
+    new THREE.OctahedronGeometry(1.5, 0)
+  ];
+  
+  const opalMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x112244, // Deep sapphire blue baseline (never grey)
+    emissive: 0x050a1a, // Very subtle glow
+    transmission: 0.85, 
+    opacity: 1,
+    metalness: 0.2,
+    roughness: 0.2, 
+    ior: 1.4,
+    thickness: 3.0,
+    iridescence: 1.0, 
+    iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [100, 400], 
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1
+  });
+
+  const bgObjects = [];
+  for(let i=0; i<25; i++) {
+    const geom = bgGeometries[Math.floor(Math.random() * bgGeometries.length)];
+    const mesh = new THREE.Mesh(geom, opalMaterial);
+    
+    mesh.position.set((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 30, -10 - Math.random() * 20);
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    mesh.userData = { rx: (Math.random() - 0.5) * 0.01, ry: (Math.random() - 0.5) * 0.01, rz: (Math.random() - 0.5) * 0.01 };
+    
+    bgGroup.add(mesh);
+    bgObjects.push(mesh);
+  }
+
+  // --- Layer 2: Massive Central Anchor ---
+  const anchorGroup = new THREE.Group();
+  anchorGroup.position.set(0, 0, -15);
+  bgGroup.add(anchorGroup);
+
+  const anchorGeom = new THREE.DodecahedronGeometry(5, 1);
+  const obsidianMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x1a053a, // Deep amethyst base
+    emissive: 0x0a011a, // Slight purple glow
+    transmission: 0.6, 
+    opacity: 1,
+    metalness: 0.5,
+    roughness: 0.1,
+    ior: 2.0, 
+    thickness: 8.0,
+    iridescence: 1.0, 
+    iridescenceIOR: 1.8,
+    iridescenceThicknessRange: [200, 600],
+    clearcoat: 1.0
+  });
+  const anchorMesh = new THREE.Mesh(anchorGeom, obsidianMaterial);
+  anchorGroup.add(anchorMesh);
+
+  const ringGeom = new THREE.TorusGeometry(6.5, 0.02, 16, 100);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00eaff, wireframe: true, transparent: true, opacity: 0.2 });
+  const ring1 = new THREE.Mesh(ringGeom, ringMat);
+  const ring2 = new THREE.Mesh(ringGeom, ringMat);
+  ring1.rotation.x = Math.PI / 2;
+  ring2.rotation.y = Math.PI / 2;
+  anchorGroup.add(ring1);
+  anchorGroup.add(ring2);
+
+  // --- Layer 3: Foreground Crystal (Given a slight cyan tint) ---
+  const crystalMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xe0ffff, // Faint cyan baseline instead of pure white
+    transmission: 1.0, 
+    opacity: 1,
+    metalness: 0.0,
+    roughness: 0.02, 
+    ior: 1.6, 
+    thickness: 5.0,
+    dispersion: 4.5, 
+    specularIntensity: 2.0,
+    clearcoat: 1.0
+  });
+
+  const glassGroup = new THREE.Group();
+  scene.add(glassGroup);
+  
+  const glassGeometries = [
+    new THREE.SphereGeometry(1.5, 64, 64),
+    new THREE.OctahedronGeometry(1.2, 0),
+    new THREE.IcosahedronGeometry(1.2, 0)
+  ];
+  
+  const glassObjects = [];
+  for(let i = 0; i < 15; i++) {
+    const geom = glassGeometries[Math.floor(Math.random() * glassGeometries.length)];
+    const glassObj = new THREE.Mesh(geom, crystalMaterial);
+    
+    const scale = Math.random() * 1.5 + 0.5;
+    glassObj.scale.set(scale, scale, scale);
+    glassObj.position.set((Math.random() - 0.5) * 22, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 8 + 2);
+    glassObj.userData = {
+      speedX: (Math.random() - 0.5) * 0.01, speedY: (Math.random() - 0.5) * 0.01, speedZ: (Math.random() - 0.5) * 0.01,
+      rx: (Math.random() - 0.5) * 0.015, ry: (Math.random() - 0.5) * 0.015
+    };
+    
+    glassGroup.add(glassObj);
+    glassObjects.push(glassObj);
+  }
+
+  // --- Mouse Parallax ---
+  const card = document.getElementById('glass-card');
+  let mouseX = 0; let mouseY = 0;
+  let targetX = 0; let targetY = 0;
+
+  document.addEventListener('mousemove', (e) => {
+    targetX = (e.clientX / window.innerWidth) * 2 - 1;
+    targetY = -(e.clientY / window.innerHeight) * 2 + 1;
+    const tiltX = (e.clientY / window.innerHeight - 0.5) * -15;
+    const tiltY = (e.clientX / window.innerWidth - 0.5) * 15;
+    card.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateZ(20px)`;
+  });
+
+  // --- Animation Loop ---
+  const clock = new THREE.Clock();
+  let stateMult = 1.0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const time = clock.getElapsedTime();
+
+    mouseX += (targetX - mouseX) * 0.05;
+    mouseY += (targetY - mouseY) * 0.05;
+
+    if(isCleaned) {
+      stateMult = THREE.MathUtils.lerp(stateMult, 4.0, 0.015);
+      ringMat.color.lerp(successColor, 0.02);
+      ringMat.opacity = 0.6;
+      ring1.rotation.y += 0.03;
+      ring2.rotation.x += 0.03;
+
+      pointLights.forEach(p => { 
+        p.light.color.lerp(successColor, 0.02); 
+        p.light.intensity = 80; // Safe bloom level
+      });
+    } else {
+      ring1.rotation.y += 0.003;
+      ring2.rotation.x += 0.003;
+    }
+
+    // Slowly drift the nebula
+    nebulaMesh.rotation.y = time * 0.01;
+    nebulaMesh.rotation.x = time * 0.005;
+
+    anchorGroup.rotation.x = time * 0.05 * stateMult;
+    anchorGroup.rotation.y = time * 0.07 * stateMult;
+
+    pointLights.forEach((p) => {
+      p.light.position.x = Math.sin(time * p.speed + p.offset) * 18;
+      p.light.position.y = Math.cos(time * p.speed * 1.5 + p.offset) * 12;
+      p.light.position.z = Math.sin(time * p.speed * 0.5 + p.offset) * 12 - 5;
+    });
+
+    fireflies.forEach(f => {
+      f.mesh.position.x += f.speedX;
+      f.mesh.position.y += f.speedY;
+      f.mesh.position.z += f.speedZ;
+      if(f.mesh.position.x > 25 || f.mesh.position.x < -25) f.speedX *= -1;
+      if(f.mesh.position.y > 18 || f.mesh.position.y < -18) f.speedY *= -1;
+      if(f.mesh.position.z > 10 || f.mesh.position.z < -25) f.speedZ *= -1;
+    });
+
+    bgObjects.forEach(obj => {
+      obj.rotation.x += obj.userData.rx * stateMult * 0.5;
+      obj.rotation.y += obj.userData.ry * stateMult * 0.5;
+      obj.rotation.z += obj.userData.rz * stateMult * 0.5;
+    });
+
+    glassObjects.forEach(obj => {
+      obj.position.x += obj.userData.speedX;
+      obj.position.y += obj.userData.speedY;
+      obj.position.z += obj.userData.speedZ;
+      if(obj.position.x > 18) obj.position.x = -18;
+      if(obj.position.x < -18) obj.position.x = 18;
+      if(obj.position.y > 12) obj.position.y = -12;
+      if(obj.position.y < -12) obj.position.y = 12;
+      obj.rotation.x += obj.userData.rx;
+      obj.rotation.y += obj.userData.ry;
+    });
+
+    camera.position.x = mouseX * 4;
+    camera.position.y = mouseY * 4;
+    camera.lookAt(scene.position);
+
+    composer.render();
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // -------- CSV Logic --------
+  let cleanedCSV = "";
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  function isValidEmail(text){ return emailRegex.test(text.trim()); }
+
+  function parseCSVRow(row){
+    let cells = [], current = "", insideQuotes = false;
+    for(let i=0; i<row.length; i++){
+      let char = row[i];
+      if(char === '"') insideQuotes = !insideQuotes;
+      else if(char === ',' && !insideQuotes) { cells.push(current); current = ""; }
+      else current += char;
+    }
+    cells.push(current);
+    return cells;
+  }
+
+  document.getElementById("fileInput").addEventListener("change", e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+      const text = event.target.result;
+      const rows = text.split(/\r?\n/).filter(r => r.trim() !== "");
+      if(rows.length === 0){ document.getElementById("status").textContent = "CSV is empty!"; return; }
+      
+      const parsed = rows.map(parseCSVRow);
+      const columnScores = new Array(parsed[0].length).fill(0);
+      
+      for(let r=0; r<parsed.length; r++){
+        for(let c=0; c<parsed[r].length; c++){
+          const cell = parsed[r][c] || "";
+          const parts = cell.split(/[,;]+/).map(s => s.trim());
+          if(parts.some(isValidEmail)) columnScores[c]++;
+        }
+      }
+      
+      const maxScore = Math.max(...columnScores);
+      if(maxScore === 0){ document.getElementById("status").textContent = "No valid emails detected."; return; }
+      
+      const emailColumn = columnScores.indexOf(maxScore);
+      let cleanedRows = [], removed = 0;
+      
+      for(let r=0; r<rows.length; r++){
+        const cell = parsed[r][emailColumn] || "";
+        const parts = cell.split(/[,;]+/).map(s => s.trim());
+        if(parts.some(isValidEmail)) cleanedRows.push(parsed[r]);
+        else removed++;
+      }
+      
+      cleanedRows = cleanedRows.map(row => {
+        const cell = row[emailColumn] || "";
+        const parts = cell.split(/[,;]+/).map(s => s.trim());
+        const valid = parts.filter(isValidEmail);
+        row[emailColumn] = valid.join(", ");
+        return row;
+      }).filter(row => row[emailColumn] !== "");
+      
+      cleanedCSV = cleanedRows.map(row =>
+        row.map(cell => cell.includes(',') || cell.includes('"') ? `"${cell.replace(/"/g, '""')}"` : cell).join(",")
+      ).join("\n");
+      
+      isCleaned = true;
+      document.getElementById("status").innerHTML = `<b>Success!</b> Removed ${removed} invalid rows.`;
+      document.getElementById("status").style.color = "#00ffaa";
+      
+      const btn = document.getElementById("downloadBtn");
+      btn.disabled = false;
+      btn.classList.add("success-btn");
+      
+      const card = document.getElementById("glass-card");
+      card.classList.add("success");
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const blob = new Blob([cleanedCSV], {type: "text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "cleaned.csv";
+    a.click();
+  };
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <title>Liquid CSV Email Cleaner Deluxe</title>
 
 <style>
