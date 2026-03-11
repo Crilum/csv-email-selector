@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CSV Email Cleaner</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background:#f5f5f5;
+    padding:40px;
+}
+
+.container {
+    max-width:600px;
+    margin:auto;
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    box-shadow:0 5px 15px rgba(0,0,0,0.1);
+}
+
+h1 {
+    margin-top:0;
+}
+
+input[type=file] {
+    margin-top:15px;
+}
+
+button {
+    margin-top:20px;
+    padding:10px 16px;
+    border:none;
+    background:#007bff;
+    color:white;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+button:hover {
+    background:#0056b3;
+}
+
+#status {
+    margin-top:20px;
+    color:#333;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>CSV Email Cleaner</h1>
+
+<p>Upload a CSV file. Rows without a valid email in the <b>Email</b> column will be removed.</p>
+
+<input type="file" id="fileInput" accept=".csv">
+
+<br>
+
+<button id="downloadBtn" disabled>Download Clean CSV</button>
+
+<div id="status"></div>
+
+</div>
+
+<script>
+
+let cleanedCSV = "";
+
+function isValidEmail(email) {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email.trim());
+}
+
+document.getElementById("fileInput").addEventListener("change", function(e) {
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(event) {
+
+        const text = event.target.result;
+
+        const rows = text.split(/\r?\n/).filter(r => r.trim() !== "");
+
+        const headers = rows[0].split(",");
+
+        const emailIndex = headers.findIndex(h => h.trim().toLowerCase() === "email");
+
+        if (emailIndex === -1) {
+            document.getElementById("status").textContent =
+                "No 'Email' column found.";
+            return;
+        }
+
+        const cleanedRows = [rows[0]];
+
+        let removed = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+
+            const cols = rows[i].split(",");
+
+            const email = cols[emailIndex] || "";
+
+            if (isValidEmail(email)) {
+                cleanedRows.push(rows[i]);
+            } else {
+                removed++;
+            }
+        }
+
+        cleanedCSV = cleanedRows.join("\n");
+
+        document.getElementById("status").textContent =
+            `Removed ${removed} invalid rows. ${cleanedRows.length-1} rows kept.`;
+
+        document.getElementById("downloadBtn").disabled = false;
+    };
+
+    reader.readAsText(file);
+
+});
+
+document.getElementById("downloadBtn").addEventListener("click", function() {
+
+    const blob = new Blob([cleanedCSV], {type:"text/csv"});
+
+    const a = document.createElement("a");
+
+    a.href = URL.createObjectURL(blob);
+    a.download = "cleaned.csv";
+
+    a.click();
+
+});
+
+</script>
+
+</body>
+</html>
